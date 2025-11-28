@@ -1,3 +1,4 @@
+
 #ifndef VISUALTREATMENT_H
 #define VISUALTREATMENT_H
 
@@ -21,47 +22,51 @@ purpose:	Visualtreatment-Shader for NFS Carbon
 #define FLASH_SCALE		    cvVisualTreatmentParams.x
 #define COP_INTRO_SCALE     cvVisualTreatmentParams.z
 #define BREAKER_INTENSITY   cvVisualTreatmentParams.y
+#if MOTIONBLUR_QUALITY < 2
 #define VIGNETTE_SCALE		cvVisualTreatmentParams.w
+#else
+#define VIGNETTE_SCALE		1.0
+#endif
 
-shared float4x4 cmWorldView                         : cmWorldView; //WORLDVIEW
-//shared float4x4	cmWorldViewProj                 : WorldViewProj;
-shared float4x4 cmWorldMat                          : cmWorldMat; //local to world 
+float4x4 cmWorldView : cmWorldView; //WORLDVIEW
+//float4x4 cmWorldViewProj : WorldViewProj;
+float4x4 cmWorldMat : cmWorldMat; //local to world
 
-shared float3 cvLocalEyePos                         : cvLocalEyePos; //LOCALEYEPOS;
-shared float4 cvBlurParams                          : cvBlurParams;
-shared float4 cvTextureOffset                       : cvTextureOffset;
-shared float4 cvVisualEffectFadeColour              : cvVisualEffectFadeColour;
+float3 cvLocalEyePos : cvLocalEyePos; //LOCALEYEPOS;
+float4 cvBlurParams : cvBlurParams;
+float4 cvTextureOffset : cvTextureOffset;
+float4 cvVisualEffectFadeColour : cvVisualEffectFadeColour;
 
-// The per-color weighting to be used for luminance	calculations in	RGB	order.
-static const float3	LUMINANCE_VECTOR = float3(0.2126f, 0.7152f, 0.0722f);
-static const int MAX_SAMPLES = 16;	// Maximum texture grabs
+// The per-color weighting to be used for luminance calculations in RGB order.
+static const float3 LUMINANCE_VECTOR = float3(0.2126f, 0.7152f, 0.0722f);
+static const int MAX_SAMPLES = 16; // Maximum texture grabs
 
-// Contains	sampling offsets used by the techniques 
-shared float4 cavSampleOffsetWeights[MAX_SAMPLES]	: REG_cavSampleOffsetWeights;
-shared float4 cavSampleOffsets[MAX_SAMPLES]         : REG_cavSampleOffsets;
+float4 cavSampleOffsetWeights[MAX_SAMPLES] : REG_cavSampleOffsetWeights;
+float4 cavSampleOffsets[MAX_SAMPLES] : REG_cavSampleOffsets;
 
-// Tone	mapping	variables
-shared float cfBloomScale                           : cfBloomScale;
-shared float cfMiddleGray                           : REG_cfMiddleGray;
-shared float cfBrightPassThreshold                  : REG_cfBrightPassThreshold;
+float cfBloomScale : cfBloomScale;
+float cfMiddleGray : REG_cfMiddleGray;
+float cfBrightPassThreshold : REG_cfBrightPassThreshold;
 
-uniform float gAverageLuminance;
-uniform float gExposure;
+float gAverageLuminance;
+float gExposure;
 
-shared float4 Coeffs0                               : CURVE_COEFFS_0;
-shared float4 Coeffs1                               : CURVE_COEFFS_1;
+float4 Coeffs0 : CURVE_COEFFS_0;
+float4 Coeffs1 : CURVE_COEFFS_1;
 
-shared float cfVignetteScale                        : cfVignetteScale;
-shared float4 cvVisualTreatmentParams               : cvVisualTreatmentParams;
-shared float4 cvVisualTreatmentParams2              : cvVisualTreatmentParams2;
-shared float cfVisualEffectVignette                 : cfVisualEffectVignette;
-shared float cfVisualEffectBrightness               : cfVisualEffectBrightness;
+float cfVignetteScale : cfVignetteScale;
+float4 cvVisualTreatmentParams : cvVisualTreatmentParams;
+float4 cvVisualTreatmentParams2 : cvVisualTreatmentParams2;
+float cfVisualEffectVignette : cfVisualEffectVignette;
+float cfVisualEffectBrightness : cfVisualEffectBrightness;
 
 // Depth of Field variables
-shared float4 cvDepthOfFieldParams : cvDepthOfFieldParams; //DEPTHOFFIELD_PARAMS;
-shared bool cbDrawDepthOfField : cbDrawDepthOfField;
-shared bool cbDepthOfFieldEnabled : cbDepthOfFieldEnabled;
+float4 cvDepthOfFieldParams : cvDepthOfFieldParams; //DEPTHOFFIELD_PARAMS;
+bool cbDrawDepthOfField : cbDrawDepthOfField;
+bool cbDepthOfFieldEnabled : cbDepthOfFieldEnabled;
 
+float4 DownSampleOffset0 : REG_cvDownSampleOffset0;
+float4 DownSampleOffset1 : REG_cvDownSampleOffset1;
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Samplers
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -241,44 +246,88 @@ float4 colour	: COLOR0;
 // Structs
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if MOTIONBLUR_QUALITY == 2
 struct VS_INPUT_SCREEN
 {
-    float4 position : POSITION;
+    float4 position : SV_Position;
+    float4 tex0 : TEXCOORD0;
+    float4 tex1 : TEXCOORD1;
+    float4 tex2 : TEXCOORD2;
+    float4 tex3 : TEXCOORD3;
+    float4 tex4 : TEXCOORD4;
+    float4 tex5 : TEXCOORD5;
+    float4 tex6 : TEXCOORD6;
+    float4 tex7 : TEXCOORD7;
+};
+#else
+struct VS_INPUT_SCREEN
+{
+    float4 position : SV_Position;
     float4 tex0 : TEXCOORD0;
     float4 tex1 : TEXCOORD1;
 };
+#endif
 
+#if MOTIONBLUR_QUALITY == 2
 struct VtoP
 {
-    float4 position : POSITION;
+    float4 position : SV_Position;
+    float4 tex01 : TEXCOORD0;
+    float4 tex23 : TEXCOORD1;
+    float4 tex45 : TEXCOORD2;
+    float4 tex67 : TEXCOORD3;
+};
+#else
+struct VtoP
+{
+    float4 position : SV_Position;
     float4 tex0 : TEXCOORD0;
     float4 tex1 : TEXCOORD1;
 };
+#endif
 
 VtoP vertex_shader_passthru(const VS_INPUT_SCREEN IN)
+#if MOTIONBLUR_QUALITY == 2
+{
+    VtoP OUT;
+    OUT.position = IN.position;
+    OUT.tex01.xy = IN.tex0.xy;
+    OUT.tex01.zw = IN.tex1.xy;
+    OUT.tex23.xy = IN.tex2.xy;
+    OUT.tex23.zw = IN.tex3.xy;
+    OUT.tex45.xy = IN.tex4.xy;
+    OUT.tex45.zw = IN.tex5.xy;
+    OUT.tex67.xy = IN.tex6.xy;
+    OUT.tex67.zw = IN.tex7.xy;
+    return OUT;
+}
+#else
 {
     VtoP OUT;
     OUT.position = IN.position;
     OUT.tex0 = IN.tex0;
     OUT.tex1 = IN.tex1;
-
     return OUT;
 }
+#endif
 
 float4 PS_PassThru(const VtoP IN) : COLOR
 {
+    float4 diffuse;
+#if MOTIONBLUR_QUALITY == 2
+    diffuse = tex2D(DIFFUSE_SAMPLER, IN.tex01.xy);
+#else
+    diffuse = tex2D(DIFFUSE_SAMPLER, IN.tex0.xy);
+#endif
     float4 OUT;
-
-    float4 diffuse = tex2D(DIFFUSE_SAMPLER, IN.tex0.xy);	// * IN;
     OUT.xyz = diffuse.xyz;
     OUT.w = diffuse.w;
-
     return OUT;
 }
 
 struct PS_INPUT
 {
-    float4 position : POSITION;
+    float4 position : SV_Position;
     float4 tex0 : TEXCOORD0;
     float4 tex1 : TEXCOORD1;
 };
@@ -374,9 +423,10 @@ float2 generateHQJitter(int index, float2 baseTex)
 static const float baseRampCoeff = 0.75; // Base coefficient, dynamically modulated
 
 // Motion Blur Vertex Shader
-struct VS_INPUT_MOTIONBLUR
-{
-    float4 position : POSITION;
+// Motion Blur Vertex Shader
+#if MOTIONBLUR_QUALITY == 2
+struct VS_INPUT_MOTIONBLUR {
+    float4 position : SV_Position;
     float4 tex0 : TEXCOORD0;
     float4 tex1 : TEXCOORD1;
     float4 tex2 : TEXCOORD2;
@@ -386,19 +436,45 @@ struct VS_INPUT_MOTIONBLUR
     float4 tex6 : TEXCOORD6;
     float4 tex7 : TEXCOORD7;
 };
-
-struct VtoP_MOTIONBLUR
-{
-    float4 position : POSITION;
-    float2 tex[8] : TEXCOORD0;
+struct VtoP_MOTIONBLUR {
+    float4 position : SV_Position;
+    float4 tex01 : TEXCOORD0;
+    float4 tex23 : TEXCOORD1;
+    float4 tex45 : TEXCOORD2;
+    float4 tex67 : TEXCOORD3;
 };
-
-// Vertex Shader
-VtoP_MOTIONBLUR VS_MotionBlur(const VS_INPUT_MOTIONBLUR IN)
-{
+VtoP_MOTIONBLUR VS_MotionBlur(const VS_INPUT_MOTIONBLUR IN) {
     VtoP_MOTIONBLUR OUT;
     OUT.position = IN.position;
-
+    OUT.tex01.xy = IN.tex0.xy;
+    OUT.tex01.zw = IN.tex1.xy;
+    OUT.tex23.xy = IN.tex2.xy;
+    OUT.tex23.zw = IN.tex3.xy;
+    OUT.tex45.xy = IN.tex4.xy;
+    OUT.tex45.zw = IN.tex5.xy;
+    OUT.tex67.xy = IN.tex6.xy;
+    OUT.tex67.zw = IN.tex7.xy;
+    return OUT;
+}
+#else
+struct VS_INPUT_MOTIONBLUR {
+    float4 position : SV_Position;
+    float4 tex0 : TEXCOORD0;
+    float4 tex1 : TEXCOORD1;
+    float4 tex2 : TEXCOORD2;
+    float4 tex3 : TEXCOORD3;
+    float4 tex4 : TEXCOORD4;
+    float4 tex5 : TEXCOORD5;
+    float4 tex6 : TEXCOORD6;
+    float4 tex7 : TEXCOORD7;
+};
+struct VtoP_MOTIONBLUR {
+    float4 position : SV_Position;
+    float2 tex[8] : TEXCOORD0;
+};
+VtoP_MOTIONBLUR VS_MotionBlur(const VS_INPUT_MOTIONBLUR IN) {
+    VtoP_MOTIONBLUR OUT;
+    OUT.position = IN.position;
     OUT.tex[0] = IN.tex0.xy;
     OUT.tex[1] = IN.tex1.xy;
     OUT.tex[2] = IN.tex2.xy;
@@ -407,11 +483,40 @@ VtoP_MOTIONBLUR VS_MotionBlur(const VS_INPUT_MOTIONBLUR IN)
     OUT.tex[5] = IN.tex5.xy;
     OUT.tex[6] = IN.tex6.xy;
     OUT.tex[7] = IN.tex7.xy;
-
     return OUT;
 }
+#endif
 
-// Motion Blur Pixel Shader
+#if MOTIONBLUR_QUALITY == 2
+// MW X360-style packed UVs and vignette mask
+float4 PS_MotionBlur(const VtoP IN) : COLOR 
+{
+
+	float   depth	  = tex2D( MOTIONBLUR_SAMPLER, IN.tex01.xy ).w;
+
+	// compute motion blurred image
+	float4 screenTex0 = tex2D( MOTIONBLUR_SAMPLER, IN.tex01.xy);
+	float3 screenTex1 = tex2D( DIFFUSE_SAMPLER, lerp(IN.tex01.zw, IN.tex01.xy, 0.9));
+	float3 screenTex2 = tex2D( DIFFUSE_SAMPLER, lerp(IN.tex23.xy, IN.tex01.xy, 0.9));
+	float3 screenTex3 = tex2D( DIFFUSE_SAMPLER, lerp(IN.tex23.zw, IN.tex01.xy, 0.9));
+	float3 screenTex4 = tex2D( DIFFUSE_SAMPLER, lerp(IN.tex45.xy, IN.tex01.xy, 0.9));
+	float3 screenTex5 = tex2D( DIFFUSE_SAMPLER, lerp(IN.tex45.zw, IN.tex01.xy, 0.9));
+	float3 screenTex6 = tex2D( DIFFUSE_SAMPLER, lerp(IN.tex67.xy, IN.tex01.xy, 0.9));
+	float3 screenTex7 = tex2D( DIFFUSE_SAMPLER, lerp(IN.tex67.zw, IN.tex01.xy, 0.9));
+	const float kBlurRatio = 0;
+	const float kBlend = 1.0 / (16.0 + kBlurRatio);
+	float3 radialBlur = screenTex0.xyz*(kBlend*3.0f)  
+                      + screenTex1*(kBlend*3.0f) 
+                      + screenTex2*(kBlend*2.0f) 
+                      + screenTex3*(kBlend*2.0f) 
+                      + screenTex4*(kBlend*2.0f)  
+                      + screenTex5*(kBlend*1.5f) 
+                      + screenTex6*(kBlend*1.5f)  
+                      + screenTex7*(kBlend*1.0f);
+	
+	return float4(radialBlur,depth);
+}
+#else
 float4 PS_MotionBlur(const VtoP_MOTIONBLUR IN) : COLOR
 {
     float4 result = 0;
@@ -450,22 +555,60 @@ float4 PS_MotionBlur(const VtoP_MOTIONBLUR IN) : COLOR
 
     return saturate(result);
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Apply Motion Blur
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 VtoP VS_CompositeBlur(const VS_INPUT_SCREEN IN)
+#if MOTIONBLUR_QUALITY == 2
 {
     VtoP OUT;
-
+    OUT.position = IN.position;
+    OUT.tex01.xy = IN.tex0.xy;
+    OUT.tex01.zw = IN.tex1.xy;
+    OUT.tex23.xy = IN.tex2.xy;
+    OUT.tex23.zw = IN.tex3.xy;
+    OUT.tex45.xy = IN.tex4.xy;
+    OUT.tex45.zw = IN.tex5.xy;
+    OUT.tex67.xy = IN.tex6.xy;
+    OUT.tex67.zw = IN.tex7.xy;
+    return OUT;
+}
+#else
+{
+    VtoP OUT;
     OUT.position = IN.position;
     OUT.tex0 = IN.tex0;
     OUT.tex1 = IN.tex1;
-
     return OUT;
 }
+#endif
 
+#if MOTIONBLUR_QUALITY == 2
+float4 PS_CompositeBlur(const VtoP IN) : COLOR
+{
+	float4 vignette = tex2D(MISCMAP2_SAMPLER, float2(IN.tex01.x, IN.tex01.y * VIGNETTE_SCALE));
+	float depth = tex2D(DEPTHBUFFER_SAMPLER, IN.tex01.xy).x;
+	float zDist = (1 / (1 - depth));
+
+	float4 result = 1;
+
+	// compute motion blurred image
+	float4 screenTex0 = tex2D(DIFFUSE_SAMPLER, IN.tex01.xy);
+
+	float3 radialBlur = tex2D(MOTIONBLUR_SAMPLER, IN.tex01.xy).xyz;
+
+	// mask motion blurred image with vignette and radial blur
+	float blurDepth = tex2D(MOTIONBLUR_SAMPLER, IN.tex01.xy).w; // saturate(-zDist/300+1.2);
+	float motionBlurMask = saturate(vignette.x + cvBlurParams.z) * blurDepth;
+	float radialBlurMask = vignette.w * cvBlurParams.x;
+	result.xyz = lerp(screenTex0.xyz, radialBlur, motionBlurMask + radialBlurMask);
+
+	return result;
+}
+#else
 DepthSpriteOut PS_CompositeBlur(const VtoP IN)
 {
     DepthSpriteOut OUT;
@@ -495,6 +638,7 @@ DepthSpriteOut PS_CompositeBlur(const VtoP IN)
 
     return OUT;
 }
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Fake HDR function - ported from ReShade but optimized by me
@@ -527,6 +671,16 @@ float4 applyHDR(const VtoP IN, in float4 result)
         float2( 0.70710678, -0.70710678)
     };
 
+
+#if MOTIONBLUR_QUALITY == 2
+    [loop]
+    for (int i = 0; i < 8; ++i)
+    {
+        float2 dir = directions[i];
+        bloom_sum1 += tex2D(DIFFUSE_SAMPLER, IN.tex01.xy + dir * radius1).rgb;
+        bloom_sum2 += tex2D(DIFFUSE_SAMPLER, IN.tex01.xy + dir * radius2).rgb;
+    }
+#else
     [loop]
     for (int i = 0; i < 8; ++i)
     {
@@ -534,6 +688,7 @@ float4 applyHDR(const VtoP IN, in float4 result)
         bloom_sum1 += tex2D(DIFFUSE_SAMPLER, IN.tex0.xy + dir * radius1).rgb;
         bloom_sum2 += tex2D(DIFFUSE_SAMPLER, IN.tex0.xy + dir * radius2).rgb;
     }
+#endif
 
     bloom_sum1 *= (1.0 / 8.0);
     bloom_sum2 *= (1.0 / 8.0);
@@ -563,7 +718,12 @@ float4 DoDepthOfField(const VtoP IN, in float4 result, float depth)
     float maxBlur = cvDepthOfFieldParams.w;
     float blur = saturate((abs(zDist - focalDist) - depthOfField) * falloff / zDist);
     float mipLevel = blur * maxBlur;
-    float3 blurredTex = tex2Dbias(MISCMAP6_SAMPLER, float4(IN.tex0.xy, 0, mipLevel)).rgb;
+    float3 blurredTex;
+#if MOTIONBLUR_QUALITY == 2
+    blurredTex = tex2Dbias(MISCMAP6_SAMPLER, float4(IN.tex01.xy, 0, mipLevel)).rgb;
+#else
+    blurredTex = tex2Dbias(MISCMAP6_SAMPLER, float4(IN.tex0.xy, 0, mipLevel)).rgb;
+#endif
     result = float4(lerp(result.xyz, blurredTex, saturate(mipLevel)), result.w);
 
     //result.xyz = saturate((abs(zDist-50)-30)*falloff/zDist);
@@ -633,9 +793,15 @@ float4 applyDesaturation(float4 result, float amount)
 
 float3 applySubsurfaceBlur(const VtoP IN, float3 color)
 {
+#if MOTIONBLUR_QUALITY == 2
+    float2 offset = float2(0.002, 0); // horizontal spread
+    float3 blurred = tex2D(DIFFUSE_SAMPLER, IN.tex01.xy + offset).rgb;
+    return lerp(color, blurred, 0.07); // super subtle
+#else
     float2 offset = float2(0.002, 0); // horizontal spread
     float3 blurred = tex2D(DIFFUSE_SAMPLER, IN.tex0.xy + offset).rgb;
     return lerp(color, blurred, 0.07); // super subtle
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -780,21 +946,31 @@ float luminance(float3 color)
 
 float4 applySharpen(const VtoP IN, float4 result)
 {
-    float2 uv = IN.tex0.xy;
-
-    // sample all from the same source (raw scene)
+#if MOTIONBLUR_QUALITY == 2
+    float2 uv = IN.tex01.xy;
     float3 c = tex2D(DIFFUSE_SAMPLER, uv).rgb;
     float3 l = tex2D(DIFFUSE_SAMPLER, uv - float2(texelSizeL0.x, 0)).rgb;
     float3 r = tex2D(DIFFUSE_SAMPLER, uv + float2(texelSizeL0.x, 0)).rgb;
     float3 t = tex2D(DIFFUSE_SAMPLER, uv - float2(0, texelSizeL0.y)).rgb;
     float3 b = tex2D(DIFFUSE_SAMPLER, uv + float2(0, texelSizeL0.y)).rgb;
-
     float3 blur = (l + r + t + b + c) * (1.0 / 5.0);
     float3 highpass = c - blur;
     highpass = clamp(highpass, -0.25, 0.25); // keep symmetric edges
-
     result.rgb = saturate(result.rgb + highpass * SHARPEN_AMOUNT);
     return result;
+#else
+    float2 uv = IN.tex0.xy;
+    float3 c = tex2D(DIFFUSE_SAMPLER, uv).rgb;
+    float3 l = tex2D(DIFFUSE_SAMPLER, uv - float2(texelSizeL0.x, 0)).rgb;
+    float3 r = tex2D(DIFFUSE_SAMPLER, uv + float2(texelSizeL0.x, 0)).rgb;
+    float3 t = tex2D(DIFFUSE_SAMPLER, uv - float2(0, texelSizeL0.y)).rgb;
+    float3 b = tex2D(DIFFUSE_SAMPLER, uv + float2(0, texelSizeL0.y)).rgb;
+    float3 blur = (l + r + t + b + c) * (1.0 / 5.0);
+    float3 highpass = c - blur;
+    highpass = clamp(highpass, -0.25, 0.25); // keep symmetric edges
+    result.rgb = saturate(result.rgb + highpass * SHARPEN_AMOUNT);
+    return result;
+#endif
 }
 #endif
 
@@ -830,7 +1006,12 @@ static const float3 RGB_OFFSET = float3(1.0, 0.0, -1.0);
 
 float4 applyNosChromaticAberration(const VtoP IN, in float4 result) : COLOR
 {
-    float2 uv = IN.tex0.xy;
+    float2 uv;
+#if MOTIONBLUR_QUALITY == 2
+    uv = IN.tex01.xy;
+#else
+    uv = IN.tex0.xy;
+#endif
     float2 center = float2(0.5, 0.5);
     float2 fromCenter = uv - center;
     float dist = length(fromCenter);
@@ -862,8 +1043,12 @@ float4 applyNosChromaticAberration(const VtoP IN, in float4 result) : COLOR
 
 float4 applyLensDirt(const VtoP IN, float4 baseColor) : COLOR
 {
-    // sample dirt texture
-    float4 lensDirt = tex2D(CUSTOM_SAMPLER, IN.tex0.xy);
+    float4 lensDirt;
+#if MOTIONBLUR_QUALITY == 2
+    lensDirt = tex2D(CUSTOM_SAMPLER, IN.tex01.xy);
+#else
+    lensDirt = tex2D(CUSTOM_SAMPLER, IN.tex0.xy);
+#endif
 
     // calculate scene luminance
     float sceneLuminance = dot(baseColor.rgb, LUMINANCE_VECTOR);
@@ -899,8 +1084,12 @@ float4 applyLensDirt(const VtoP IN, float4 baseColor) : COLOR
 #if USE_FILMGRAIN == 1
 float4 applyFilmGrain(const VtoP IN, in float4 result) : COLOR
 {
-    // Sample a noise texture to simulate film grain
-    float2 noiseUV = IN.tex0.xy * 5.0f;
+    float2 noiseUV;
+#if MOTIONBLUR_QUALITY == 2
+    noiseUV = IN.tex01.xy * 5.0f;
+#else
+    noiseUV = IN.tex0.xy * 5.0f;
+#endif
 
     float t = frac(cvTextureOffset.w * 0.123f);
     float noise = generateNoise(noiseUV + t);
@@ -922,7 +1111,12 @@ static const float2 VIGNETTE_CENTER = float2(0.5, 0.5);
 // Screen Vignette function
 float4 applyVignette(VtoP IN, float4 result) : COLOR
 {
-    float2 d = (IN.tex0.xy - VIGNETTE_CENTER) / max(VIGNETTE_RADIUS, 1e-3);
+    float2 d;
+    #if MOTIONBLUR_QUALITY == 2
+        d = (IN.tex01.xy - VIGNETTE_CENTER) / max(VIGNETTE_RADIUS, 1e-3);
+    #else
+        d = (IN.tex0.xy - VIGNETTE_CENTER) / max(VIGNETTE_RADIUS, 1e-3);
+    #endif
     float r2 = dot(d,d);
 
     // smooth falloff – no hard ring, only darken edges
@@ -971,13 +1165,14 @@ float4 ShaderPass(const VtoP IN, in float4 result)
 #endif
 
 #if USE_BLOOM == 1
+#if MOTIONBLUR_QUALITY == 2
+    float4 bloomEffect = tex2D(BLOOM_SAMPLER, IN.tex01.xy);
+#else
     float4 bloomEffect = tex2D(BLOOM_SAMPLER, IN.tex0.xy);
-
+#endif
     float3 bloomColor = bloomEffect.rgb * BLOOM_INTENSITY;
-
     float3 additiveBlend = result.rgb + bloomColor;
     float3 screenBlend = 1.0f - (1.0f - result.rgb) * (1.0f - bloomColor);
-
     result.rgb = lerp(screenBlend, additiveBlend, BLOOM_BLEND_MODE);
 #endif
 
@@ -1000,6 +1195,26 @@ float4 ShaderPass(const VtoP IN, in float4 result)
 }
 #endif
 
+#if MOTIONBLUR_QUALITY == 2
+float4 PS_DownScale4x4AlphaLuminance(in float2 vScreenPosition : TEXCOORD0) : COLOR
+{
+	// exploit bilinear interpolation mode to get 16 samples using only
+	// 4 texture lookup instructions (same bandwidth usage as previous)
+	// note: offsets should have only four unique values, really only
+	// need one parameter
+	float4 result;
+	float4 uv0 = vScreenPosition.xyxy + (DownSampleOffset0 * 8);
+	float4 uv1 = vScreenPosition.xyxy + (DownSampleOffset1 * 8);
+	result = tex2D(DIFFUSE_SAMPLER, uv0.xy) + tex2D(DIFFUSE_SAMPLER, uv0.zw) + tex2D(DIFFUSE_SAMPLER, uv1.xy) + tex2D(DIFFUSE_SAMPLER, uv1.zw);
+
+	// Store the luminance in alpha, scale all components
+	result.w = dot(result.xyz, LUMINANCE_VECTOR);
+	result *= 0.25f;
+
+	return result;
+}
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // you shouldnt touch these
 // Visualtreatment Function
@@ -1007,10 +1222,59 @@ float4 ShaderPass(const VtoP IN, in float4 result)
 
 float4 PS_VisualTreatment(const VtoP IN, uniform bool doDepthOfField, uniform bool doColourFade) : COLOR
 {
+    float4 vignette;
+#if MOTIONBLUR_QUALITY == 2
+    // MW X360-style: 8-tap packed UVs, MW-style blending and vignette mask
+    //--------------------------------------------------------------------------
+	// 1) VIGNETTE & DEPTH CALCULATION
+	// (Note: the reference code uses IN.tex01.xy; here we use IN.tex01.xy –
+	// adjust if needed for your vertex output.)
+	vignette = tex2D(MISCMAP2_SAMPLER, float2(IN.tex01.x, IN.tex01.y * VIGNETTE_SCALE));
+	float depth = tex2D(DEPTHBUFFER_SAMPLER, IN.tex01.xy).x;
+	float zDist = 1.0 / (1.0 - depth);
+
+	//--------------------------------------------------------------------------
+	// 2) MOTION BLUR (MW‐inspired weighted blending)
+	float4 screenTex0 = tex2D(DIFFUSE_SAMPLER, IN.tex01.xy);
+	float3 screenTex1 = tex2D(DIFFUSE_SAMPLER, IN.tex01.zw);
+	float3 screenTex2 = tex2D(DIFFUSE_SAMPLER, IN.tex23.xy);
+	float3 screenTex3 = tex2D(DIFFUSE_SAMPLER, IN.tex23.zw);
+	float3 screenTex4 = tex2D(DIFFUSE_SAMPLER, IN.tex45.xy);
+	float3 screenTex5 = tex2D(DIFFUSE_SAMPLER, IN.tex45.zw);
+	float3 screenTex6 = tex2D(DIFFUSE_SAMPLER, IN.tex67.xy);
+	float3 screenTex7 = tex2D(DIFFUSE_SAMPLER, IN.tex67.zw);
+
+	const float kBlurRatio = 0;
+	const float kBlend = 1.0 / (16.0 + kBlurRatio);
+	float3 radialBlur = screenTex0.xyz * (kBlend * 3.0f) +
+						screenTex1 * (kBlend * 3.0f) +
+						screenTex2 * (kBlend * 2.0f) +
+						screenTex3 * (kBlend * 2.0f) +
+						screenTex4 * (kBlend * 2.0f) +
+						screenTex5 * (kBlend * 1.5f) +
+						screenTex6 * (kBlend * 1.5f) +
+						screenTex7 * (kBlend * 1.0f);
+
+	// Create the motion-blur mask from vignette and blur parameters.
+	float blurDepth = saturate(-zDist / 300.0 + 1.2);
+	// (You might multiply vignette.x+cvBlurParams.x by blurDepth when DOF is active.)
+	float motionBlurMask = (vignette.x + cvBlurParams.x);
+	float radialBlurMask = vignette.w * cvBlurParams.y;
+
+	float4 result;
+	result.xyz = lerp(screenTex0.xyz, radialBlur, saturate(motionBlurMask + radialBlurMask));
+	result.w = screenTex0.w;
+
+	//--------------------------------------------------------------------------
+	// 3) LUMINANCE & (OPTIONAL) AUTOEXPOSURE
+	float luminance = dot(result.xyz, LUMINANCE_VECTOR);
+#else
     // Predefenitions
     float depth = tex2D(DEPTHBUFFER_SAMPLER, IN.tex0.xy).r;
-    float4 result = tex2D(DIFFUSE_SAMPLER, IN.tex0.xy);
+    float3 result = tex2D(DIFFUSE_SAMPLER, IN.tex0.xy).rgb;
     float luminance = dot(result.xyz, LUMINANCE_VECTOR);
+    vignette = tex2D(MISCMAP2_SAMPLER, IN.tex0.xy);
+#endif
 
 #if USE_ABERRATION == 1
     result = applyNosChromaticAberration(IN, result);
@@ -1078,7 +1342,6 @@ float4 PS_VisualTreatment(const VtoP IN, uniform bool doDepthOfField, uniform bo
     result.xyz = saturate(result.xyz);
 #else
     // Uses Vanilla Speedbreaker
-    float4 vignette = tex2D(MISCMAP2_SAMPLER, IN.tex0.xy);
     result.xyz = lerp(result.xyz, luminance * 1.5, saturate(result) * BREAKER_INTENSITY);
 #endif
 
@@ -1100,13 +1363,20 @@ float4 PS_UvesOverCliff(const VtoP IN, uniform bool doColourFade) : COLOR
 {
     float4 result;
 
-// Initialize result with screen texture
-float4 screenTex = tex2D(DIFFUSE_SAMPLER, IN.tex0.xy);
-result = screenTex;
 
+#if MOTIONBLUR_QUALITY == 2
+    float4 screenTex = tex2D(DIFFUSE_SAMPLER, IN.tex01.xy);
+    result = screenTex;
+    // MW X360-style vignette: lerp to black using vignette.y as mask
+    float4 vignette = tex2D(MISCMAP2_SAMPLER, IN.tex01.xy);
+    result.xyz = lerp(result.xyz, 0.0, saturate(vignette.y) * VIGNETTE_SCALE);
+#else
+    float4 screenTex = tex2D(DIFFUSE_SAMPLER, IN.tex0.xy);
+    result = screenTex;
 #if USE_VIGNETTE == 1
     // Apply vignette effect
     result = applyVignette(IN, result);
+#endif
 #endif
 
 #if USE_LUT == 1
@@ -1114,12 +1384,6 @@ result = screenTex;
     result.rgb = saturate(result.rgb);
     result.rgb = tex3D(VOLUMEMAP_SAMPLER, result.rgb).rgb;
 #endif
-
-    // VIGNETTE
-    float4 vign = tex2D(MISCMAP2_SAMPLER, IN.tex0.xy);
-    float edge = saturate(vign.y);                           // 0 center, 1 edges (angenommen)
-    float edgeDarken = lerp(1.0, 1.0 - VIGNETTE_SCALE, edge);
-    result.rgb *= edgeDarken;
 
     // Calculate luminance and max channel
     float luminance = dot(LUMINANCE_VECTOR, result.xyz);
